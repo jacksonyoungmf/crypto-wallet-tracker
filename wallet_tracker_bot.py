@@ -90,31 +90,42 @@ class WalletTracker:
         :return: Boolean indicating if transaction is valid
         """
         try:
-            # Minimum transaction value (in wei)
-            min_value_wei = w3.to_wei(0.01, 'ether')  # 0.01 ETH
-            
-            # Validate transaction value
-            if tx['value'] < min_value_wei:
-                logger.info(f"Filtered low-value transaction: {w3.from_wei(tx['value'], 'ether')} ETH")
-                return False
+            # Log full transaction details for debugging
+            logger.info(f"Validating transaction: {tx}")
             
             # Validate transaction hash
-            if not tx['hash'] or len(tx['hash'].hex()) != 66:
-                logger.warning(f"Invalid transaction hash: {tx['hash'].hex() if tx['hash'] else 'None'}")
+            if not tx['hash']:
+                logger.warning(f"Transaction hash is None")
                 return False
             
-            # Optional: Check transaction receipt status
+            # Convert hash to hex and validate length
+            try:
+                tx_hash_hex = tx['hash'].hex()
+                if len(tx_hash_hex) != 66:
+                    logger.warning(f"Invalid transaction hash length: {tx_hash_hex}")
+                    return False
+            except Exception as hash_error:
+                logger.warning(f"Error processing transaction hash: {hash_error}")
+                return False
+            
+            # Validate transaction value with more detailed logging
+            value_in_ether = w3.from_wei(tx['value'], 'ether')
+            logger.info(f"Transaction value: {value_in_ether} ETH")
+            
+            # Optional: Check transaction receipt status with more error details
             try:
                 receipt = w3.eth.get_transaction_receipt(tx['hash'])
-                if receipt and receipt['status'] != 1:
-                    logger.warning(f"Transaction failed: {tx['hash'].hex()}")
-                    return False
-            except Exception as e:
-                logger.warning(f"Could not fetch transaction receipt: {e}")
+                if receipt:
+                    logger.info(f"Transaction receipt status: {receipt['status']}")
+                    if receipt['status'] != 1:
+                        logger.warning(f"Transaction failed: {tx_hash_hex}")
+                        return False
+            except Exception as receipt_error:
+                logger.warning(f"Could not fetch transaction receipt: {receipt_error}")
             
             return True
         except Exception as e:
-            logger.error(f"Transaction validation error: {e}")
+            logger.error(f"Comprehensive transaction validation error: {e}")
             return False
 
     def check_wallet_transactions(self):
