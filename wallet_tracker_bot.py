@@ -1,6 +1,8 @@
 import os
 import time
 import logging
+import signal
+import sys
 from dotenv import load_dotenv
 from web3 import Web3
 import telegram
@@ -20,6 +22,34 @@ logging.basicConfig(
     ]
 )
 logger = logging.getLogger(__name__)
+
+# Global variable for the bot instance
+bot_instance = None
+chat_id = None
+
+# Signal handler for graceful shutdown
+def signal_handler(signum, frame):
+    logger.info("Shutdown signal received")
+    if bot_instance and chat_id:
+        # Create event loop if it doesn't exist
+        try:
+            loop = asyncio.get_event_loop()
+        except RuntimeError:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+        
+        # Send shutdown message
+        loop.run_until_complete(
+            bot_instance.send_message(
+                chat_id=chat_id,
+                text="⚠️ Wallets have stopped being tracked"
+            )
+        )
+    sys.exit(0)
+
+# Register signal handlers
+signal.signal(signal.SIGINT, signal_handler)
+signal.signal(signal.SIGTERM, signal_handler)
 
 class WalletTracker:
     def __init__(self, telegram_token, chat_id, wallets, blockchain='ethereum'):
@@ -195,9 +225,14 @@ async def main():
     """
     Main function to initialize and run the wallet tracker
     """
+    global bot_instance, chat_id
+    
     # Telegram configuration
     telegram_token = os.getenv('TELEGRAM_BOT_TOKEN')
     chat_id = os.getenv('TELEGRAM_CHAT_ID')
+    
+    # Initialize bot instance
+    bot_instance = telegram.Bot(token=telegram_token)
     
     # Initialize tracker
     tracker = WalletTracker(telegram_token, chat_id, {
