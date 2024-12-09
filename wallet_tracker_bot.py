@@ -52,13 +52,14 @@ signal.signal(signal.SIGINT, signal_handler)
 signal.signal(signal.SIGTERM, signal_handler)
 
 class WalletTracker:
-    def __init__(self, telegram_token, chat_id, wallets, blockchain='ethereum'):
+    def __init__(self, telegram_token, chat_id, wallets, wallet_names, blockchain='ethereum'):
         """
         Initialize the wallet tracker bot
         
         :param telegram_token: Telegram bot token
         :param chat_id: Telegram chat ID to send notifications
         :param wallets: Dictionary of wallets for different blockchains
+        :param wallet_names: Dictionary of wallet names for different blockchains
         :param blockchain: Primary blockchain to track (default: ethereum)
         """
         self.telegram_bot = telegram.Bot(token=telegram_token)
@@ -80,6 +81,7 @@ class WalletTracker:
         
         # Prepare wallet tracking
         self.wallets = {}
+        self.wallet_names = {}
         for chain, addresses in wallets.items():
             if chain.lower() not in self.blockchain_configs:
                 logger.warning(f"Unsupported blockchain: {chain}. Skipping.")
@@ -89,7 +91,10 @@ class WalletTracker:
             self.wallets[chain.lower()] = [
                 Web3.to_checksum_address(addr.lower()) for addr in addresses
             ]
-        
+            
+            # Store corresponding wallet names
+            self.wallet_names[chain.lower()] = wallet_names.get(chain, [])
+
         # Initialize Web3 connections
         self.w3_connections = {}
         for chain, config in self.blockchain_configs.items():
@@ -185,12 +190,19 @@ class WalletTracker:
                             transactions_filtered += 1
                             continue
                         
+                        # Find wallet names for sender and receiver
+                        from_index = self.wallets[chain].index(tx['from']) if tx['from'] in self.wallets[chain] else -1
+                        to_index = self.wallets[chain].index(tx['to']) if tx['to'] is not None and tx['to'] in self.wallets[chain] else -1
+                        
+                        from_name = self.wallet_names[chain][from_index] if from_index != -1 else tx['from']
+                        to_name = self.wallet_names[chain][to_index] if to_index != -1 else (tx['to'] or 'Contract Creation')
+                        
                         # Format transaction details
                         tx_details = f"""
 🚨 <b>{self.blockchain_configs[chain]['chain_name']} Wallet Transaction Detected</b> 🚨
 📊 Block: {block_num}
-💸 From: <code>{tx['from']}</code>
-💰 To: <code>{tx['to'] or 'Contract Creation'}</code>
+💸 From: <code>{from_name}</code> (<code>{tx['from']}</code>)
+💰 To: <code>{to_name}</code> {f"(<code>{tx['to']}</code>)" if tx['to'] else ''}
 💵 Value: {w3.from_wei(tx['value'], 'ether')} {chain.upper()}
 🔗 Tx Hash: <code>{tx['hash'].hex()}</code>
 🌐 Explorer: {self.blockchain_configs[chain]['explorer_url']}{tx['hash'].hex()}
@@ -237,7 +249,10 @@ async def main():
     # Initialize tracker
     tracker = WalletTracker(telegram_token, chat_id, {
         'ethereum': os.getenv('ETHEREUM_WALLETS', '').split(','),
-        'base': os.getenv('BASE_WALLETS', '').split(',')
+        'base': os.getenv('BASE_WALLETS', '').split(','),
+    }, {
+        'ethereum': os.getenv('ETHEREUM_WALLET_NAMES', '').split(','),
+        'base': os.getenv('BASE_WALLET_NAMES', '').split(','),
     })
     
     # Send startup message
