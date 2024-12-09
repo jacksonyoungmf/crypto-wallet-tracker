@@ -66,6 +66,12 @@ jobs:
         pip list
         echo "Environment variables:"
         env | grep -E 'TELEGRAM|ETHEREUM|BASE'
+        echo "Contents of .env file:"
+        cat .env || echo ".env file not found"
+        echo "Python path:"
+        which python3
+        echo "Current directory contents:"
+        ls -la
 
     - name: Deploy and Run Wallet Tracker
       env:
@@ -75,12 +81,13 @@ jobs:
         BASE_RPC_URL: ${{ secrets.BASE_RPC_URL }}
       run: |
         source venv/bin/activate
-        # Debugging: print contents of key files
+        
+        # Print Python script for debugging
         echo "Contents of wallet_tracker_bot.py:"
         cat wallet_tracker_bot.py
         
-        # Try running the script and capture full output
-        python3 wallet_tracker_bot.py &
+        # Verbose Python execution
+        python3 -m trace --trace wallet_tracker_bot.py &
         TRACKER_PID=$!
         sleep 30  # Run for 30 seconds to capture potential startup errors
         
