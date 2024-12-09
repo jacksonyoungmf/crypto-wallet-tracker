@@ -43,14 +43,24 @@ jobs:
       run: |
         pytest tests/  # Assuming you'll add tests later
     
-    - name: Deploy to Server
-      # This is a placeholder. Replace with your actual deployment method
+    - name: Deploy and Run Wallet Tracker
+      env:
+        TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+        TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        ETHEREUM_RPC_URL: ${{ secrets.ETHEREUM_RPC_URL }}
+        BASE_RPC_URL: ${{ secrets.BASE_RPC_URL }}
       run: |
-        echo "Deployment step - can be replaced with your preferred method"
-        # Examples:
-        # - Heroku deployment
-        # - Docker container push
-        # - SSH to server and restart service
+        # Install screen for background process management
+        sudo apt-get update
+        sudo apt-get install -y screen
+
+        # Start the wallet tracker in a detached screen session
+        screen -dmS wallet_tracker python3 wallet_tracker_bot.py
+
+        # Keep the workflow running and check the process
+        screen -list
+        screen -x wallet_tracker -X hardcopy wallet_tracker.log
+        cat wallet_tracker.log
     
     - name: Send Telegram Notification
       if: always()
