@@ -1,0 +1,71 @@
+name: Crypto Wallet Tracker CI
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+  schedule:
+    # Run every 4 hours to ensure continuous monitoring
+    - cron: '0 */4 * * *'
+
+jobs:
+  test-and-deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Set up Python
+      uses: actions/setup-python@v3
+      with:
+        python-version: '3.9'
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pytest flake8
+    
+    - name: Run linter
+      run: |
+        # stop the build if there are Python syntax errors or undefined names
+        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+        # exit-zero treats all errors as warnings
+        flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+    
+    - name: Run tests
+      env:
+        TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+        TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        ETHEREUM_RPC_URL: ${{ secrets.ETHEREUM_RPC_URL }}
+        BASE_RPC_URL: ${{ secrets.BASE_RPC_URL }}
+      run: |
+        pytest tests/  # Assuming you'll add tests later
+    
+    - name: Deploy to Server
+      # This is a placeholder. Replace with your actual deployment method
+      run: |
+        echo "Deployment step - can be replaced with your preferred method"
+        # Examples:
+        # - Heroku deployment
+        # - Docker container push
+        # - SSH to server and restart service
+    
+    - name: Send Telegram Notification
+      if: always()
+      uses: appleboy/telegram-action@master
+      with:
+        to: ${{ secrets.TELEGRAM_CHAT_ID }}
+        token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+        message: |
+          🤖 Wallet Tracker CI/CD Update 🤖
+          
+          Status: ${{ job.status }}
+          
+          Workflow: ${{ github.workflow }}
+          Event: ${{ github.event_name }}
+          Ref: ${{ github.ref }}
+          
+          Repository: ${{ github.repository }}
+          Commit: ${{ github.sha }}
