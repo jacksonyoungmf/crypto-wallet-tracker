@@ -243,16 +243,27 @@ async def main():
     telegram_token = os.getenv('TELEGRAM_BOT_TOKEN')
     chat_id = os.getenv('TELEGRAM_CHAT_ID')
     
+    # Validate critical environment variables
+    if not telegram_token or not chat_id:
+        logger.critical("Missing Telegram configuration. Check TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID")
+        sys.exit(1)
+    
     # Initialize bot instance
     bot_instance = telegram.Bot(token=telegram_token)
     
+    # Safely split and filter wallet addresses and names
+    def safe_split(env_var):
+        addresses = [addr.strip() for addr in os.getenv(env_var, '').split(',') if addr.strip()]
+        logger.info(f"Loaded {len(addresses)} addresses from {env_var}")
+        return addresses
+    
     # Initialize tracker
     tracker = WalletTracker(telegram_token, chat_id, {
-        'ethereum': os.getenv('ETHEREUM_WALLETS', '').split(','),
-        'base': os.getenv('BASE_WALLETS', '').split(','),
+        'ethereum': safe_split('ETHEREUM_WALLETS'),
+        'base': safe_split('BASE_WALLETS'),
     }, {
-        'ethereum': os.getenv('ETHEREUM_WALLET_NAMES', '').split(','),
-        'base': os.getenv('BASE_WALLET_NAMES', '').split(','),
+        'ethereum': safe_split('ETHEREUM_WALLET_NAMES'),
+        'base': safe_split('BASE_WALLET_NAMES'),
     })
     
     # Send startup message
